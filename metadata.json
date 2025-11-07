@@ -1,0 +1,5 @@
+{
+  "name": "College Timetable Generator",
+  "description": "An intelligent time tabling application for colleges that automatically allocates periods for faculty, subjects, and classes based on a set of configurable constraints. It provides a clear, organized weekly schedule.",
+  "requestFramePermissions": []
+}
