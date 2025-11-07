@@ -45,40 +45,44 @@ const FacultySetup: React.FC<FacultySetupProps> = ({ faculty, setFaculty }) => {
             <button
               onClick={() => removeFaculty(f.id)}
               className="absolute top-3 right-3 text-gray-400 hover:text-red-500 transition-colors"
+              aria-label={`Remove faculty ${f.name}`}
             >
               <DeleteIcon className="h-5 w-5" />
             </button>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Name</label>
+                <label htmlFor={`name-${f.id}`} className="block text-sm font-medium text-gray-600 mb-1">Name</label>
                 <input
+                  id={`name-${f.id}`}
                   type="text"
                   placeholder="e.g., Dr. John Doe"
                   value={f.name}
                   onChange={(e) => updateFaculty(f.id, 'name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary bg-white text-gray-900"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Max Hours / Day</label>
+                <label htmlFor={`max-hours-${f.id}`} className="block text-sm font-medium text-gray-600 mb-1">Max Hours / Day</label>
                 <input
+                  id={`max-hours-${f.id}`}
                   type="number"
                   min="1"
                   max="5"
                   value={f.maxHoursPerDay}
                   onChange={(e) => updateFaculty(f.id, 'maxHoursPerDay', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary bg-white text-gray-900"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Max Consecutive Hours</label>
+                <label htmlFor={`consecutive-hours-${f.id}`} className="block text-sm font-medium text-gray-600 mb-1">Max Consecutive Hours</label>
                 <input
+                  id={`consecutive-hours-${f.id}`}
                   type="number"
                   min="1"
                   max="5"
                   value={f.maxConsecutiveHours}
                   onChange={(e) => updateFaculty(f.id, 'maxConsecutiveHours', parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary bg-white text-gray-900"
                 />
               </div>
             </div>

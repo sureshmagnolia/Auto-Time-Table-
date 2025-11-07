@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Class, Subject, Faculty, UnavailableSlot } from '../types';
+import React from 'react';
+import { Class, Subject, Faculty } from '../types';
 import { DAYS, PERIODS } from '../constants';
 import { DeleteIcon, AddIcon } from './Icons';
 
@@ -85,9 +85,9 @@ const ClassSetup: React.FC<ClassSetupProps> = ({ classes, setClasses, facultyLis
                 placeholder="e.g., Computer Science Year 1"
                 value={c.name}
                 onChange={(e) => updateClass(c.id, e.target.value)}
-                className="text-lg font-semibold border-b-2 border-gray-200 focus:border-primary focus:outline-none w-1/2"
+                className="text-lg font-semibold border-b-2 border-gray-200 focus:border-primary focus:outline-none w-1/2 p-2 bg-white text-gray-900 rounded-t-md"
               />
-              <button onClick={() => removeClass(c.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+              <button onClick={() => removeClass(c.id)} className="text-gray-400 hover:text-red-500 transition-colors" aria-label={`Remove class ${c.name}`}>
                 <DeleteIcon className="h-6 w-6" />
               </button>
             </div>
@@ -98,12 +98,13 @@ const ClassSetup: React.FC<ClassSetupProps> = ({ classes, setClasses, facultyLis
               <div className="space-y-3">
                  {c.subjects.map(s => (
                     <div key={s.id} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
-                        <input type="text" placeholder="Subject Name" value={s.name} onChange={e => updateSubject(c.id, s.id, 'name', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md"/>
-                        <select value={s.facultyId} onChange={e => updateSubject(c.id, s.id, 'facultyId', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        <input type="text" placeholder="Subject Name" value={s.name} onChange={e => updateSubject(c.id, s.id, 'name', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"/>
+                        <select value={s.facultyId} onChange={e => updateSubject(c.id, s.id, 'facultyId', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900">
+                            {facultyList.length === 0 && <option>No faculty available</option>}
                             {facultyList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
-                        <input type="number" min="1" value={s.weeklyHours} onChange={e => updateSubject(c.id, s.id, 'weeklyHours', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-md" />
-                        <button onClick={() => removeSubject(c.id, s.id)} className="text-red-500 hover:text-red-700 justify-self-end"><DeleteIcon/></button>
+                        <input type="number" min="1" value={s.weeklyHours} onChange={e => updateSubject(c.id, s.id, 'weeklyHours', parseInt(e.target.value))} className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900" />
+                        <button onClick={() => removeSubject(c.id, s.id)} className="text-red-500 hover:text-red-700 justify-self-end" aria-label={`Remove subject ${s.name}`}><DeleteIcon/></button>
                     </div>
                  ))}
                  <button onClick={() => addSubject(c.id)} className="flex items-center space-x-2 text-sm text-primary hover:text-indigo-800 font-semibold mt-2">
@@ -127,20 +128,23 @@ const ClassSetup: React.FC<ClassSetupProps> = ({ classes, setClasses, facultyLis
                     {DAYS.map(day => (
                       <tr key={day} className="border-b border-gray-200">
                         <td className="py-2 px-1 font-medium text-gray-600">{day}</td>
-                        {PERIODS.map(period => (
+                        {PERIODS.map(period => {
+                            const isUnavailable = c.unavailableSlots.some(s => s.day === day && s.period === period);
+                            return (
                           <td key={period} className="py-2 px-1">
                             <button
                               onClick={() => toggleUnavailableSlot(c.id, day, period)}
                               className={`w-10 h-10 rounded-full transition-colors ${
-                                c.unavailableSlots.some(s => s.day === day && s.period === period)
+                                isUnavailable
                                   ? 'bg-red-400 text-white'
                                   : 'bg-gray-200 hover:bg-gray-300'
                               }`}
+                              aria-label={`Toggle availability for ${day}, Period ${period}`}
                             >
-                              ✕
+                              {isUnavailable ? 'Off' : 'On'}
                             </button>
                           </td>
-                        ))}
+                        )})}
                       </tr>
                     ))}
                   </tbody>

@@ -41,6 +41,10 @@ export type TimetableDay = {
 // Error handling is managed through a union type in the service function's return signature.
 export type TimetableData = {
   [day: string]: TimetableDay;
+  // FIX: Add `error?: never` to create a discriminated union.
+  // This helps TypeScript distinguish between the TimetableData object and an error object
+  // of shape `{ error: string }`, resolving the type ambiguity in App.tsx.
+  error?: never;
 };
 
 export enum AppScreen {
