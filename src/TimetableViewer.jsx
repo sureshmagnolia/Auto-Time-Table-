@@ -102,7 +102,11 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
     // Small hack to make the drag image look better (optional)
   };
 
-  const handleDragOver = (e) => {
+  const handleDragOver = (e, targetClassId) => {
+    if (draggedCard && targetClassId && targetClassId !== draggedCard.data.classId) {
+      e.dataTransfer.dropEffect = 'none';
+      return; // Browser naturally blocks drop if preventDefault is not called
+    }
     e.preventDefault(); // allow drop
     e.dataTransfer.dropEffect = 'move';
   };
@@ -110,6 +114,12 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
   const handleDrop = (e, targetDay, targetPeriod, targetClassId) => {
     e.preventDefault();
     if (!draggedCard) return;
+
+    // Prevent dropping into a different class's row in the master grid
+    if (targetClassId && targetClassId !== draggedCard.data.classId) {
+      alert("Cards can only be placed in their own class's row!");
+      return;
+    }
 
     // Check if dropping onto a valid cell in Master View (since targetClassId is provided)
     if (!targetClassId) return;
@@ -175,7 +185,7 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
       lessonId: draggedCard.data.lessonId || draggedCard.data.id, // Handles both grid cards and unplaced cards
       teachers: draggedCard.data.teachers,
       teacherId: draggedCard.data.teacherId, // fallback
-      classId: targetClassId,
+      classId: draggedCard.data.classId, // ALWAYS preserve the original class!
       subjectId: draggedCard.data.subjectId,
       day: targetDay,
       period: targetPeriod
@@ -291,7 +301,7 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
                         return (
                           <td 
                             key={`${day}-${p}`} 
-                            onDragOver={handleDragOver}
+                            onDragOver={(e) => handleDragOver(e, cls.id)}
                             onDrop={(e) => handleDrop(e, day, p, cls.id)}
                             style={{ 
                               width: '130px', height: '55px', padding: '3px', 
