@@ -36,8 +36,12 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
     for (const t of cardTeachers) {
       if (occupied[`${day}-${period}-${t.id}`]) return false;
       if ((timeOffs[t.id] || []).includes(tKey)) return false;
-      const maxC = getRule(t.id, 'maxClassesPerDay');
-      if (maxC && maxC.isStrict && (dailyCounts[`${day}-${t.id}`] || 0) >= maxC.value) return false;
+      
+      // If the teacher is just an assistant for this class, it does not count towards their max daily limit
+      if (t.role !== 'assistant') {
+        const maxC = getRule(t.id, 'maxClassesPerDay');
+        if (maxC && maxC.isStrict && (dailyCounts[`${day}-${t.id}`] || 0) >= maxC.value) return false;
+      }
     }
     
     return true;
@@ -47,7 +51,7 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
     occupied[`${day}-${period}-${card.classId}`] = val;
     card.teachers.forEach(t => {
       occupied[`${day}-${period}-${t.id}`] = val;
-      if (dailyCounts) {
+      if (dailyCounts && t.role !== 'assistant') {
          if (val) dailyCounts[`${day}-${t.id}`] = (dailyCounts[`${day}-${t.id}`] || 0) + 1;
          else dailyCounts[`${day}-${t.id}`]--;
       }
@@ -57,8 +61,9 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
   // --- GREEDY ENGINE ---
   if (algorithm === 'greedy') {
     const occupied = {};
+    const dailyCounts = {};
     const generatedCards = [...lockedCards];
-    lockedCards.forEach(c => markOccupied(c, c.day, c.period, occupied, null, true));
+    lockedCards.forEach(c => markOccupied(c, c.day, c.period, occupied, dailyCounts, true));
     let unplacedCount = 0;
     
     for (const card of cardsToPlace) {
@@ -66,13 +71,13 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
       for (const day of days) {
         if (placed) break;
         for (const period of periods) {
-          if (isFree(day, period, card.teachers, card.classId, occupied, {})) {
+          if (isFree(day, period, card.teachers, card.classId, occupied, dailyCounts)) {
             generatedCards.push({
               ...card,
               day, 
               period
             });
-            markOccupied(card, day, period, occupied, null, true);
+            markOccupied(card, day, period, occupied, dailyCounts, true);
             placed = true;
             break;
           }
