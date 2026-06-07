@@ -370,6 +370,73 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
     );
   };
 
+  const renderFormalPrint = () => {
+    return (
+      <div className="formal-print-only">
+        <h2 style={{ textAlign: 'center', fontFamily: 'serif', marginBottom: '16px' }}>
+          {viewType === 'master' ? 'Master Timetable' : (viewType === 'class' ? `Class Timetable: ${classes.find(c => c.id === selectedEntityId)?.name || ''}` : `Teacher Timetable: ${teachers.find(t => t.id === selectedEntityId)?.name || ''}`)}
+        </h2>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', fontFamily: 'sans-serif', fontSize: '10pt' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1px solid black', padding: '6px', backgroundColor: '#f0f0f0' }}>Day</th>
+              {viewType === 'master' && <th style={{ border: '1px solid black', padding: '6px', backgroundColor: '#f0f0f0' }}>Class</th>}
+              {periods.map(p => <th key={p} style={{ border: '1px solid black', padding: '6px', backgroundColor: '#f0f0f0' }}>Period {p}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((day) => (
+              <React.Fragment key={day}>
+                {viewType === 'master' ? (
+                  classes.map((cls, cIdx) => (
+                    <tr key={cls.id}>
+                      {cIdx === 0 && <td rowSpan={classes.length} style={{ border: '1px solid black', borderBottom: '2px solid black', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f8f8f8' }}>{day}</td>}
+                      <td style={{ border: '1px solid black', padding: '6px', borderBottom: cIdx === classes.length - 1 ? '2px solid black' : '1px solid black', fontWeight: 'bold' }}>{cls.name}</td>
+                      {periods.map(p => {
+                         const card = getCardForSlot(day, p, 'class', cls.id);
+                         return (
+                           <td key={p} style={{ border: '1px solid black', padding: '4px', textAlign: 'center', borderBottom: cIdx === classes.length - 1 ? '2px solid black' : '1px solid black' }}>
+                             {card ? (
+                               <>
+                                 <div style={{ fontWeight: 'bold', fontSize: '9pt', color: 'black' }}>{subjects.find(s => s.id === card.subjectId)?.name || 'Unknown'}</div>
+                                 <div style={{ fontSize: '8pt', color: '#333' }}>{card.teachers.map(t => teachers.find(tx => tx.id === t.id)?.name || 'Unknown').join(', ')}</div>
+                               </>
+                             ) : ''}
+                           </td>
+                         )
+                      })}
+                    </tr>
+                  ))
+                ) : (
+                  <tr key={day}>
+                    <td style={{ border: '1px solid black', padding: '6px', fontWeight: 'bold', textAlign: 'center' }}>{day}</td>
+                    {periods.map(p => {
+                       const card = getCardForSlot(day, p, viewType, selectedEntityId);
+                       return (
+                         <td key={p} style={{ border: '1px solid black', padding: '4px', textAlign: 'center' }}>
+                           {card ? (
+                             <>
+                               <div style={{ fontWeight: 'bold', fontSize: '9pt', color: 'black' }}>{subjects.find(s => s.id === card.subjectId)?.name || 'Unknown'}</div>
+                               <div style={{ fontSize: '8pt', color: '#333' }}>
+                                 {viewType === 'class' ? 
+                                    card.teachers.map(t => teachers.find(tx => tx.id === t.id)?.name || 'Unknown').join(', ') : 
+                                    classes.find(c => c.id === card.classId)?.name || 'Unknown'}
+                               </div>
+                             </>
+                           ) : ''}
+                         </td>
+                       )
+                    })}
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center" style={{ marginBottom: '24px' }}>
@@ -478,6 +545,9 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
           </div>
         )}
       </div>
+      
+      {/* Formal Print View (Hidden from UI, visible only when printing) */}
+      {renderFormalPrint()}
 
       {isGenerating && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(5px)' }}>

@@ -282,12 +282,17 @@ select.input-field option {
     min-height: auto !important;
   }
 
-  /* Hide all UI elements */
+  /* Hide all UI elements and interactive grids */
   header, nav, .btn, .stray-cards-bin, .input-field, .input-group, 
-  .glass-card:not(.print-container), 
-  .glass-panel:not(.print-container),
+  .glass-card, 
+  .glass-panel,
+  .print-container,
   .diagnostics-panel {
     display: none !important;
+  }
+
+  .formal-print-only {
+    display: block !important;
   }
 
   /* Make sure the main grid is fully visible */
@@ -353,6 +358,6 @@ select.input-field option {
   }
 }
 
-.print-header {
+.print-header, .formal-print-only {
   display: none;
 }
