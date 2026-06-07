@@ -31,7 +31,7 @@ export const StatisticsViewer = ({ teachers, classes, subjects, lessons, generat
       if (type === 'lesson' && !groups[key].lessons.find(l => l.id === item.id)) {
         groups[key].lessons.push(item);
       }
-      if (type === 'card' && !groups[key].cards.find(c => c.uniqueId === item.uniqueId)) {
+      if (type === 'card' && !groups[key].cards.find(c => c.id === item.id)) {
         groups[key].cards.push(item);
       }
     };
