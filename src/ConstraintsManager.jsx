@@ -8,20 +8,20 @@ export const ConstraintsManager = ({ teachers, constraints, setConstraints }) =>
     setConstraints({
       ...constraints,
       global: {
-        ...constraints.global,
-        [key]: { ...constraints.global[key], [field]: value }
+        ...(constraints?.global || {}),
+        [key]: { ...(constraints?.global?.[key] || {}), [field]: value }
       }
     });
   };
 
   const handleTeacherChange = (teacherId, key, field, value) => {
-    const teacherData = constraints.teachers[teacherId] || {};
+    const teacherData = constraints?.teachers?.[teacherId] || {};
     const keyData = teacherData[key] || { value: '', isStrict: false };
     
     setConstraints({
       ...constraints,
       teachers: {
-        ...constraints.teachers,
+        ...(constraints?.teachers || {}),
         [teacherId]: {
           ...teacherData,
           [key]: { ...keyData, [field]: value }
@@ -31,7 +31,7 @@ export const ConstraintsManager = ({ teachers, constraints, setConstraints }) =>
   };
 
   const handleTimePreference = (teacherId, day, period, prefType) => {
-    const teacherData = constraints.teachers[teacherId] || {};
+    const teacherData = constraints?.teachers?.[teacherId] || {};
     const timePrefs = teacherData.timePreferences || {};
     const slotKey = `${day}-${period}`;
     
@@ -45,7 +45,7 @@ export const ConstraintsManager = ({ teachers, constraints, setConstraints }) =>
     setConstraints({
       ...constraints,
       teachers: {
-        ...constraints.teachers,
+        ...(constraints?.teachers || {}),
         [teacherId]: { ...teacherData, timePreferences: newPrefs }
       }
     });
@@ -54,27 +54,30 @@ export const ConstraintsManager = ({ teachers, constraints, setConstraints }) =>
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const periods = [1, 2, 3, 4, 5];
 
-  const renderRuleRow = (label, key, data, onChange) => (
-    <div className="flex items-center justify-between" style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <div style={{ flex: 1 }}>
-        <strong>{label}</strong>
-      </div>
-      <div className="flex items-center gap-4">
-        {typeof data.value === 'boolean' ? (
-          <select className="input-field" value={data.value} onChange={e => onChange(key, 'value', e.target.value === 'true')}>
-            <option value="true">Enabled</option>
-            <option value="false">Disabled</option>
+  const renderRuleRow = (label, key, data, onChange, defaultValue = 0) => {
+    const safeData = data || { value: defaultValue, isStrict: false };
+    return (
+      <div className="flex items-center justify-between" style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ flex: 1 }}>
+          <strong>{label}</strong>
+        </div>
+        <div className="flex items-center gap-4">
+          {typeof safeData.value === 'boolean' ? (
+            <select className="input-field" value={safeData.value} onChange={e => onChange(key, 'value', e.target.value === 'true')}>
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          ) : (
+            <input type="number" min="0" className="input-field" style={{ width: '80px' }} value={safeData.value} onChange={e => onChange(key, 'value', parseInt(e.target.value) || 0)} />
+          )}
+          <select className="input-field" value={safeData.isStrict} onChange={e => onChange(key, 'isStrict', e.target.value === 'true')}>
+            <option value="true">Strict (Hard)</option>
+            <option value="false">Optional (Soft)</option>
           </select>
-        ) : (
-          <input type="number" min="0" className="input-field" style={{ width: '80px' }} value={data.value} onChange={e => onChange(key, 'value', parseInt(e.target.value) || 0)} />
-        )}
-        <select className="input-field" value={data.isStrict} onChange={e => onChange(key, 'isStrict', e.target.value === 'true')}>
-          <option value="true">Strict (Hard)</option>
-          <option value="false">Optional (Soft)</option>
-        </select>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="animate-fade-in">
@@ -88,10 +91,10 @@ export const ConstraintsManager = ({ teachers, constraints, setConstraints }) =>
       {activeTab === 'global' && (
         <div className="glass-panel">
           <h3 style={{ marginBottom: '16px' }}>Global Scheduling Rules</h3>
-          {renderRuleRow("Min Classes Per Day", "minClassesPerDay", constraints.global.minClassesPerDay, handleGlobalChange)}
-          {renderRuleRow("Max Classes Per Day", "maxClassesPerDay", constraints.global.maxClassesPerDay, handleGlobalChange)}
-          {renderRuleRow("Max Consecutive Hours", "maxConsecutive", constraints.global.maxConsecutive, handleGlobalChange)}
-          {renderRuleRow("Uniform 1st/Last Hour Distribution", "uniformDistribution", constraints.global.uniformDistribution, handleGlobalChange)}
+          {renderRuleRow("Min Classes Per Day", "minClassesPerDay", constraints?.global?.minClassesPerDay, handleGlobalChange, 0)}
+          {renderRuleRow("Max Classes Per Day", "maxClassesPerDay", constraints?.global?.maxClassesPerDay, handleGlobalChange, 5)}
+          {renderRuleRow("Max Consecutive Hours", "maxConsecutive", constraints?.global?.maxConsecutive, handleGlobalChange, 3)}
+          {renderRuleRow("Uniform 1st/Last Hour Distribution", "uniformDistribution", constraints?.global?.uniformDistribution, handleGlobalChange, false)}
         </div>
       )}
 
@@ -108,9 +111,9 @@ export const ConstraintsManager = ({ teachers, constraints, setConstraints }) =>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '16px', fontSize: '0.85rem' }}>If a value is left at 0, the Global Rule will be applied.</p>
               
               <div className="glass-panel" style={{ marginBottom: '24px' }}>
-                {renderRuleRow("Min Classes Per Day", "minClassesPerDay", constraints.teachers[selectedTeacher]?.minClassesPerDay || { value: 0, isStrict: false }, (k, f, v) => handleTeacherChange(selectedTeacher, k, f, v))}
-                {renderRuleRow("Max Classes Per Day", "maxClassesPerDay", constraints.teachers[selectedTeacher]?.maxClassesPerDay || { value: 0, isStrict: false }, (k, f, v) => handleTeacherChange(selectedTeacher, k, f, v))}
-                {renderRuleRow("Max Consecutive Hours", "maxConsecutive", constraints.teachers[selectedTeacher]?.maxConsecutive || { value: 0, isStrict: false }, (k, f, v) => handleTeacherChange(selectedTeacher, k, f, v))}
+                {renderRuleRow("Min Classes Per Day", "minClassesPerDay", constraints?.teachers?.[selectedTeacher]?.minClassesPerDay, (k, f, v) => handleTeacherChange(selectedTeacher, k, f, v), 0)}
+                {renderRuleRow("Max Classes Per Day", "maxClassesPerDay", constraints?.teachers?.[selectedTeacher]?.maxClassesPerDay, (k, f, v) => handleTeacherChange(selectedTeacher, k, f, v), 0)}
+                {renderRuleRow("Max Consecutive Hours", "maxConsecutive", constraints?.teachers?.[selectedTeacher]?.maxConsecutive, (k, f, v) => handleTeacherChange(selectedTeacher, k, f, v), 0)}
               </div>
 
               <h3 style={{ marginBottom: '16px' }}>Morning / Afternoon Preferences</h3>
@@ -128,7 +131,7 @@ export const ConstraintsManager = ({ teachers, constraints, setConstraints }) =>
                   <div key={day} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <div style={{ width: '80px', fontWeight: 'bold' }}>{day}</div>
                     {periods.map(period => {
-                      const pref = (constraints.teachers[selectedTeacher]?.timePreferences || {})[`${day}-${period}`];
+                      const pref = (constraints?.teachers?.[selectedTeacher]?.timePreferences || {})[`${day}-${period}`];
                       let bg = 'rgba(255,255,255,0.05)';
                       if (pref === 'prefer') bg = 'rgba(16, 185, 129, 0.4)';
                       if (pref === 'avoid') bg = 'rgba(245, 158, 11, 0.4)';
