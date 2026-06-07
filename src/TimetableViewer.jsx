@@ -397,30 +397,40 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
         <h2 style={{ textAlign: 'center', fontFamily: 'serif', marginBottom: '16px' }}>
           {viewType === 'master' ? 'Master Timetable' : (viewType === 'class' ? `Class Timetable: ${classes.find(c => c.id === selectedEntityId)?.name || ''}` : `Teacher Timetable: ${teachers.find(t => t.id === selectedEntityId)?.name || ''}`)}
         </h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', fontFamily: 'sans-serif', fontSize: '10pt' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid black', fontFamily: 'sans-serif', fontSize: '9pt' }}>
           <thead>
             <tr>
-              <th style={{ border: '1px solid black', padding: '6px', backgroundColor: '#f0f0f0' }}>Day</th>
-              {viewType === 'master' && <th style={{ border: '1px solid black', padding: '6px', backgroundColor: '#f0f0f0' }}>Class</th>}
-              {periods.map(p => <th key={p} style={{ border: '1px solid black', padding: '6px', backgroundColor: '#f0f0f0' }}>Period {p}</th>)}
+              <th style={{ border: '1px solid black', padding: '4px', backgroundColor: '#f0f0f0' }}>Day</th>
+              {viewType === 'master' && <th style={{ border: '1px solid black', padding: '4px', backgroundColor: '#f0f0f0' }}>Class</th>}
+              {periods.map(p => <th key={p} style={{ border: '1px solid black', padding: '4px', backgroundColor: '#f0f0f0' }}>Period {p}</th>)}
             </tr>
           </thead>
           <tbody>
-            {days.map((day) => (
+            {days.map((day) => {
+              // Filter out classes that have absolutely no classes scheduled on this day
+              let activeClasses = classes;
+              if (viewType === 'master') {
+                activeClasses = classes.filter(cls => {
+                  return periods.some(p => getCardForSlot(day, p, 'class', cls.id) !== null);
+                });
+                if (activeClasses.length === 0) return null; // Skip day completely if empty
+              }
+
+              return (
               <React.Fragment key={day}>
                 {viewType === 'master' ? (
-                  classes.map((cls, cIdx) => (
+                  activeClasses.map((cls, cIdx) => (
                     <tr key={cls.id}>
-                      {cIdx === 0 && <td rowSpan={classes.length} style={{ border: '1px solid black', borderBottom: '2px solid black', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f8f8f8' }}>{day}</td>}
-                      <td style={{ border: '1px solid black', padding: '6px', borderBottom: cIdx === classes.length - 1 ? '2px solid black' : '1px solid black', fontWeight: 'bold' }}>{cls.name}</td>
+                      {cIdx === 0 && <td rowSpan={activeClasses.length} style={{ border: '1px solid black', borderBottom: '2px solid black', fontWeight: 'bold', textAlign: 'center', backgroundColor: '#f8f8f8' }}>{day}</td>}
+                      <td style={{ border: '1px solid black', padding: '2px 4px', borderBottom: cIdx === activeClasses.length - 1 ? '2px solid black' : '1px solid black', fontWeight: 'bold', fontSize: '8pt', whiteSpace: 'nowrap' }}>{cls.name}</td>
                       {periods.map(p => {
                          const card = getCardForSlot(day, p, 'class', cls.id);
                          return (
-                           <td key={p} style={{ border: '1px solid black', padding: '4px', textAlign: 'center', borderBottom: cIdx === classes.length - 1 ? '2px solid black' : '1px solid black' }}>
+                           <td key={p} style={{ border: '1px solid black', padding: '2px', textAlign: 'center', borderBottom: cIdx === activeClasses.length - 1 ? '2px solid black' : '1px solid black' }}>
                              {card ? (
                                <>
-                                 <div style={{ fontWeight: 'bold', fontSize: '9pt', color: 'black' }}>{subjects.find(s => s.id === card.subjectId)?.name || 'Unknown'}</div>
-                                 <div style={{ fontSize: '8pt', color: '#333' }}>{card.teachers.map(t => teachers.find(tx => tx.id === t.id)?.name || 'Unknown').join(', ')}</div>
+                                 <div style={{ fontWeight: 'bold', fontSize: '8pt', color: 'black', lineHeight: '1.1' }}>{subjects.find(s => s.id === card.subjectId)?.name || 'Unknown'}</div>
+                                 <div style={{ fontSize: '7pt', color: '#333', lineHeight: '1.1' }}>{card.teachers.map(t => teachers.find(tx => tx.id === t.id)?.name || 'Unknown').join(', ')}</div>
                                </>
                              ) : ''}
                            </td>
@@ -430,15 +440,15 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
                   ))
                 ) : (
                   <tr key={day}>
-                    <td style={{ border: '1px solid black', padding: '6px', fontWeight: 'bold', textAlign: 'center' }}>{day}</td>
+                    <td style={{ border: '1px solid black', padding: '4px', fontWeight: 'bold', textAlign: 'center' }}>{day}</td>
                     {periods.map(p => {
                        const card = getCardForSlot(day, p, viewType, selectedEntityId);
                        return (
-                         <td key={p} style={{ border: '1px solid black', padding: '4px', textAlign: 'center' }}>
+                         <td key={p} style={{ border: '1px solid black', padding: '2px', textAlign: 'center' }}>
                            {card ? (
                              <>
-                               <div style={{ fontWeight: 'bold', fontSize: '9pt', color: 'black' }}>{subjects.find(s => s.id === card.subjectId)?.name || 'Unknown'}</div>
-                               <div style={{ fontSize: '8pt', color: '#333' }}>
+                               <div style={{ fontWeight: 'bold', fontSize: '8pt', color: 'black', lineHeight: '1.1' }}>{subjects.find(s => s.id === card.subjectId)?.name || 'Unknown'}</div>
+                               <div style={{ fontSize: '7pt', color: '#333', lineHeight: '1.1' }}>
                                  {viewType === 'class' ? 
                                     card.teachers.map(t => teachers.find(tx => tx.id === t.id)?.name || 'Unknown').join(', ') : 
                                     classes.find(c => c.id === card.classId)?.name || 'Unknown'}
@@ -451,7 +461,7 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
                   </tr>
                 )}
               </React.Fragment>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
