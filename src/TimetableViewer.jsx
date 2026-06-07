@@ -368,12 +368,12 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
           <span style={{ fontSize: '0.85rem', color: unplacedCards.length === 0 ? 'var(--success)' : 'var(--warning)' }}>
             Unplaced: {unplacedCards.length}
           </span>
-          <select className="input-field" value={colorTheme} onChange={e => setColorTheme(e.target.value)} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)' }}>
+          <select className="input-field" value={colorTheme} onChange={e => setColorTheme(e.target.value)} style={{ padding: '8px 16px', backgroundColor: 'var(--bg-dark)' }}>
             <option value="default">Default Colors</option>
             <option value="teacher">Color by Staff</option>
             <option value="subject">Color by Subject</option>
           </select>
-          <select className="input-field" value={algorithm} onChange={e => setAlgorithm(e.target.value)} style={{ padding: '8px 16px', background: 'rgba(255,255,255,0.1)' }}>
+          <select className="input-field" value={algorithm} onChange={e => setAlgorithm(e.target.value)} style={{ padding: '8px 16px', backgroundColor: 'var(--bg-dark)' }}>
             <option value="greedy">Fast Greedy</option>
             <option value="backtracking">Deep Backtracking</option>
             <option value="genetic">Evolutionary Genetic</option>

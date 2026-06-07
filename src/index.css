@@ -161,6 +161,12 @@ h1, h2, h3, h4, h5, h6 {
   outline: none;
 }
 
+select.input-field {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  /* Force solid background for select elements to fix Windows Chrome option styling */
+}
+
 select.input-field option {
   background-color: var(--bg-dark);
   color: var(--text-primary);
