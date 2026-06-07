@@ -1,11 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { generateTimetable } from './Generator';
 import { runDiagnostics } from './DiagnosticsEngine';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useStore } from './store';
+
+import { useStore as useZustandStore } from 'zustand';
 
 export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs, generatedCards, setGeneratedCards, constraints }) => {
+  const pastStatesCount = useZustandStore(useStore.temporal, state => state.pastStates.length);
+  const futureStatesCount = useZustandStore(useStore.temporal, state => state.futureStates.length);
+  const undo = () => useStore.temporal.getState().undo();
+  const redo = () => useStore.temporal.getState().redo();
+
   const [viewType, setViewType] = useState('master'); // 'class', 'teacher', 'master'
   const [selectedEntityId, setSelectedEntityId] = useState('');
   const [draggedCard, setDraggedCard] = useState(null); // { source: 'bin' | 'grid', data: {...} }
+  const [hoveredSlot, setHoveredSlot] = useState(null); // { day, period, classId, status: 'green' | 'yellow' | 'red' }
   const [algorithm, setAlgorithm] = useState('backtracking'); // 'greedy', 'backtracking', 'genetic'
   const [colorTheme, setColorTheme] = useState('teacher'); // 'default', 'teacher', 'subject'
   
@@ -16,11 +27,15 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const periods = [1, 2, 3, 4, 5];
 
+  const totalCardsCount = useMemo(() => lessons.reduce((sum, l) => sum + l.periods, 0), [lessons]);
+
   // Derive unplaced cards
   const unplacedCards = useMemo(() => {
     const placedCounts = {};
     generatedCards.forEach(c => {
-      placedCounts[c.lessonId] = (placedCounts[c.lessonId] || 0) + 1;
+      if (c.day !== null && c.period !== null) {
+        placedCounts[c.lessonId] = (placedCounts[c.lessonId] || 0) + 1;
+      }
     });
 
     const unplaced = [];
@@ -28,11 +43,14 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
       const placed = placedCounts[l.id] || 0;
       const remaining = l.periods - placed;
       for (let i = 0; i < remaining; i++) {
-        unplaced.push({ ...l, uniqueId: `${l.id}-unplaced-${i}` });
+        const strayMatch = generatedCards.find(c => c.lessonId === l.id && c.day === null);
+        unplaced.push({ ...l, id: strayMatch ? strayMatch.id : `${l.id}-unplaced-${i}`, uniqueId: `${l.id}-unplaced-${i}` });
       }
     });
     return unplaced;
   }, [lessons, generatedCards]);
+
+  const placedCardsCount = totalCardsCount - unplacedCards.length;
 
   const diagnostics = useMemo(() => runDiagnostics(lessons, teachers, classes, timeOffs, constraints), [lessons, teachers, classes, timeOffs, constraints]);
   const diagnosticsErrors = diagnostics.filter(i => i.type === 'error');
@@ -52,9 +70,11 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
     await new Promise(r => setTimeout(r, 100));
 
     try {
+      const lockedCards = generatedCards.filter(c => c.locked);
       const { cards, unplacedCount, timeout, type } = await generateTimetable(
         lessons, teachers, classes, timeOffs, constraints, algorithm, 
-        (data) => setProgressData(data)
+        (data) => setProgressData(data),
+        lockedCards
       );
       
       setGeneratedCards(cards);
@@ -101,6 +121,8 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
     style.id = 'dynamic-print-style';
     if (mode === 'professional') {
       style.innerHTML = '@page { size: A4 portrait; margin: 10mm; }';
+    } else if (mode === 'a3-portrait') {
+      style.innerHTML = '@page { size: A3 portrait; margin: 10mm; } .formal-print-only table { font-size: 7.5pt !important; }';
     } else {
       style.innerHTML = '@page { size: A4 landscape; margin: 10mm; }';
     }
@@ -116,20 +138,164 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
     }, 100);
   };
 
+  const handleGeneratePDF = () => {
+    let title = 'Master Timetable';
+    if (viewType === 'class') title = `Class Timetable: ${classes.find(c => c.id === selectedEntityId)?.name || ''}`;
+    if (viewType === 'teacher') title = `Teacher Timetable: ${teachers.find(t => t.id === selectedEntityId)?.name || ''}`;
+
+    const head = [];
+    const body = [];
+    
+    if (viewType === 'master') {
+       head.push(['Day', 'Class', ...periods.map(p => `Period ${p}`)]);
+       
+       days.forEach(day => {
+          let dayClasses = classes.filter(cls => periods.some(p => getCardForSlot(day, p, 'class', cls.id) !== null));
+          if (dayClasses.length === 0) dayClasses = classes; // If all empty, just show them anyway
+          
+          dayClasses.forEach((cls, cIdx) => {
+             const row = [];
+             row.push(cIdx === 0 ? day : '');
+             row.push(cls.short || cls.name);
+             
+             periods.forEach(p => {
+                const card = getCardForSlot(day, p, 'class', cls.id);
+                if (card) {
+                   const subject = subjects.find(s => s.id === card.subjectId)?.name || 'Unknown';
+                   const tNames = card.teachers.map(t => teachers.find(tx => tx.id === t.id)?.name || 'Unknown').join(', ');
+                   row.push(`${subject}\n${tNames}`);
+                } else {
+                   row.push('');
+                }
+             });
+             body.push(row);
+          });
+       });
+    } else {
+       head.push(['Day', ...periods.map(p => `Period ${p}`)]);
+       days.forEach(day => {
+          const row = [day];
+          periods.forEach(p => {
+             const card = getCardForSlot(day, p, viewType, selectedEntityId);
+             if (card) {
+                 const subject = subjects.find(s => s.id === card.subjectId)?.name || 'Unknown';
+                 const subtitle = viewType === 'class' ? 
+                    card.teachers.map(t => teachers.find(tx => tx.id === t.id)?.name || 'Unknown').join(', ') : 
+                    classes.find(c => c.id === card.classId)?.name || 'Unknown';
+                 row.push(`${subject}\n${subtitle}`);
+             } else {
+                 row.push('');
+             }
+          });
+          body.push(row);
+       });
+    }
+
+    // Binary search/iteration to find the perfect font size to fit on exactly 1 page
+    let finalDoc = null;
+    let fontSize = 11;
+    let cellPadding = 6;
+    
+    while (fontSize >= 3) {
+      const doc = new jsPDF('p', 'pt', 'a3');
+      
+      doc.setFontSize(22);
+      doc.setTextColor(40, 40, 40);
+      doc.text(title, 40, 50);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on ${new Date().toLocaleDateString()}`, 40, 70);
+
+      autoTable(doc, {
+         head: [head[0]],
+         body: body,
+         startY: 90,
+         theme: 'grid',
+         styles: { fontSize: fontSize, cellPadding: cellPadding, valign: 'middle', halign: 'center', lineColor: [200, 200, 200], lineWidth: 0.5 },
+         headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold', fontSize: Math.min(12, fontSize + 1) },
+         columnStyles: {
+            0: { fontStyle: 'bold', fillColor: [245, 245, 250], textColor: [50, 50, 50] },
+            1: viewType === 'master' ? { fontStyle: 'bold', halign: 'left', fillColor: [250, 250, 250] } : {}
+         },
+         didParseCell: function(data) {
+            if (viewType === 'master' && data.section === 'body' && data.column.index === 0) {
+               // Let's implement real rowSpan for the Day column!
+               if (data.cell.raw !== '') {
+                  const day = data.cell.raw;
+                  let dayClasses = classes.filter(cls => periods.some(p => getCardForSlot(day, p, 'class', cls.id) !== null));
+                  if (dayClasses.length === 0) dayClasses = classes;
+                  data.cell.rowSpan = dayClasses.length;
+                  data.cell.styles.valign = 'middle';
+               }
+            }
+         }
+      });
+      
+      finalDoc = doc;
+      if (doc.internal.getNumberOfPages() === 1) {
+         break; // It fits perfectly on 1 page!
+      }
+      
+      // If it overflowed to page 2, shrink everything and try again
+      fontSize -= 0.5;
+      cellPadding = Math.max(1, cellPadding - 0.5);
+    }
+
+    finalDoc.save(`${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
+  };
+
   const handleDragStart = (e, source, data) => {
     setDraggedCard({ source, data });
     // Required for Firefox
     e.dataTransfer.effectAllowed = 'move';
-    // Small hack to make the drag image look better (optional)
   };
 
-  const handleDragOver = (e, targetClassId) => {
-    if (draggedCard && targetClassId && targetClassId !== draggedCard.data.classId) {
-      e.dataTransfer.dropEffect = 'none';
-      return; // Browser naturally blocks drop if preventDefault is not called
-    }
+  const handleDragOver = (e, day, period, classId) => {
     e.preventDefault(); // allow drop
     e.dataTransfer.dropEffect = 'move';
+    
+    // If not in master view or no class ID, we don't handle dropping cleanly yet
+    if (!classId) return;
+
+    if (!draggedCard || draggedCard.data.classId !== classId) {
+      setHoveredSlot({ day, period, classId, status: 'red' });
+      return;
+    }
+
+    // Check hard constraints
+    const cardTeachers = draggedCard.data.teachers || (draggedCard.data.teacherId ? [{id: draggedCard.data.teacherId}] : []);
+    let isHardConflict = false;
+
+    // Check timeoffs
+    if ((timeOffs[classId] || []).includes(`${day}-${period}`)) isHardConflict = true;
+    for (const t of cardTeachers) {
+      if ((timeOffs[t.id] || []).includes(`${day}-${period}`)) isHardConflict = true;
+      // Double booking check (ignoring the dragged card itself and any card it might swap with)
+      const existingCard = generatedCards.find(c => c.day === day && c.period === period && c.classId === classId);
+      const db = generatedCards.find(c => 
+        c.day === day && 
+        c.period === period && 
+        c.id !== draggedCard.data.id &&
+        c.id !== existingCard?.id &&
+        (c.teachers || []).some(ct => ct.id === t.id)
+      );
+      if (db) isHardConflict = true;
+    }
+
+    // Check soft constraints
+    let isSoftConflict = false;
+    if (!isHardConflict && constraints?.global?.maxClassesPerDay?.value) {
+      const classCardsThatDay = generatedCards.filter(c => c.day === day && c.classId === classId && c.id !== draggedCard.data.id);
+      if (classCardsThatDay.length >= constraints.global.maxClassesPerDay.value) {
+        isSoftConflict = true;
+      }
+    }
+
+    setHoveredSlot({ 
+      day, period, classId, 
+      status: isHardConflict ? 'red' : (isSoftConflict ? 'yellow' : 'green') 
+    });
   };
 
   const handleDrop = (e, targetDay, targetPeriod, targetClassId) => {
@@ -192,9 +358,8 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
          // Check constraints for existingCard moving to draggedCard's old slot!
          // (For MVP, we just aggressively swap and let user fix if it creates a warning, or block it)
          // We will just swap.
-         existingCard.day = draggedCard.data.day;
-         existingCard.period = draggedCard.data.period;
-         newGeneratedCards.push(existingCard);
+         const newExistingCard = { ...existingCard, day: draggedCard.data.day, period: draggedCard.data.period };
+         newGeneratedCards.push(newExistingCard);
       }
     } else {
       // From bin. Existing card (if any) just goes to the bin (remains deleted from generatedCards)
@@ -223,6 +388,25 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
     // Remove from generated cards (moves it back to bin automatically via derived state)
     setGeneratedCards(generatedCards.filter(c => c.id !== draggedCard.data.id));
     setDraggedCard(null);
+  };
+
+  const toggleLock = (e, cardId) => {
+    e.stopPropagation();
+    setGeneratedCards(generatedCards.map(c => c.id === cardId ? { ...c, locked: !c.locked } : c));
+  };
+
+  const bulkLock = (type, value, lockState) => {
+    setGeneratedCards(prev => prev.map(c => {
+      if (c.day === null || c.period === null) return c;
+      let match = false;
+      if (type === 'all') match = true;
+      else if (type === 'period') match = c.period === value;
+      else if (type === 'class-day') match = c.classId === value.classId && c.day === value.day;
+      else if (type === 'day') match = c.day === value;
+      
+      if (match) return { ...c, locked: lockState };
+      return c;
+    }));
   };
 
   const getColorForId = (id) => {
@@ -256,8 +440,8 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
 
     return (
       <div 
-        draggable
-        onDragStart={(e) => handleDragStart(e, isStray ? 'bin' : 'grid', card)}
+        draggable={!card.locked}
+        onDragStart={(e) => { if (!card.locked) handleDragStart(e, isStray ? 'bin' : 'grid', card) }}
         className="timetable-card"
         style={{ 
           opacity: draggedCard?.data?.id === card.id ? 0.5 : 1, 
@@ -266,18 +450,29 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
           color: 'white', 
           borderRadius: '6px', 
           fontSize: '0.65rem', 
-          cursor: 'grab', 
+          cursor: card.locked ? 'default' : 'grab', 
           boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-          border: '1px solid rgba(255,255,255,0.15)',
+          border: card.locked ? '2px solid rgba(255,255,255,0.8)' : '1px solid rgba(255,255,255,0.15)',
           display: 'flex',
           flexDirection: 'column',
           gap: '2px',
           lineHeight: 1.1,
           width: '100%',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          position: 'relative'
         }}
       >
-        <div className="card-title" style={{ fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.3)', letterSpacing: '0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subjectName}</div>
+        {!isStray && viewType === 'master' && (
+          <div 
+             className="no-print"
+             onClick={(e) => toggleLock(e, card.id)} 
+             style={{ position: 'absolute', top: '2px', right: '4px', cursor: 'pointer', fontSize: '0.8rem', zIndex: 5, background: 'rgba(0,0,0,0.2)', borderRadius: '4px', padding: '1px 3px' }}
+             title={card.locked ? "Unlock card" : "Lock card in place"}
+          >
+            {card.locked ? '🔒' : '🔓'}
+          </div>
+        )}
+        <div className="card-title" style={{ fontWeight: 'bold', textShadow: '0 1px 2px rgba(0,0,0,0.3)', letterSpacing: '0.02em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: !isStray && viewType === 'master' ? '16px' : '0' }}>{subjectName}</div>
         <div className="card-subtitle" style={{ color: 'rgba(255,255,255,0.95)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{teacherNames}</div>
         {!isStray && <div className="card-subtitle" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{className}</div>}
         {isStray && <div className="card-subtitle" style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.6rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{className}</div>}
@@ -294,8 +489,26 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
           <thead>
             <tr>
               <th style={{ width: '80px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Day</th>
-              <th style={{ width: '120px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Class</th>
-              {periods.map(p => <th key={p} style={{ textAlign: 'center', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Period {p}</th>)}
+              <th style={{ width: '120px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  Class
+                  <div className="no-print" style={{ display: 'flex', gap: '4px' }}>
+                    <button onClick={() => bulkLock('all', null, true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }} title="Lock All Cards">🔒</button>
+                    <button onClick={() => bulkLock('all', null, false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.9rem', padding: 0 }} title="Unlock All Cards">🔓</button>
+                  </div>
+                </div>
+              </th>
+              {periods.map(p => (
+                <th key={p} style={{ textAlign: 'center', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    Period {p}
+                    <div className="no-print" style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={() => bulkLock('period', p, true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: 0, opacity: 0.7 }} title={`Lock all Period ${p}`}>🔒</button>
+                      <button onClick={() => bulkLock('period', p, false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: 0, opacity: 0.7 }} title={`Unlock all Period ${p}`}>🔓</button>
+                    </div>
+                  </div>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -309,27 +522,48 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
                     <tr key={`${day}-${cls.id}`}>
                       {classIndex === 0 && (
                         <td rowSpan={classes.length} style={{ fontWeight: 'bold', verticalAlign: 'middle', textAlign: 'center', borderBottom: '2px solid rgba(255,255,255,0.2)', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
-                          {day}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            {day}
+                            <div className="no-print" style={{ display: 'flex', gap: '4px' }}>
+                              <button onClick={() => bulkLock('day', day, true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: 0, opacity: 0.7 }} title={`Lock whole day`}>🔒</button>
+                              <button onClick={() => bulkLock('day', day, false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', padding: 0, opacity: 0.7 }} title={`Unlock whole day`}>🔓</button>
+                            </div>
+                          </div>
                         </td>
                       )}
                       <td style={{ fontWeight: 'bold', borderBottom: borderBottomStyle }}>
-                        {cls.short || cls.name}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{cls.short || cls.name}</span>
+                          <div className="no-print" style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+                            <button onClick={() => bulkLock('class-day', { classId: cls.id, day }, true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', padding: 0, opacity: 0.6 }} title="Lock Row">🔒</button>
+                            <button onClick={() => bulkLock('class-day', { classId: cls.id, day }, false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', padding: 0, opacity: 0.6 }} title="Unlock Row">🔓</button>
+                          </div>
+                        </div>
                       </td>
                       {periods.map(p => {
                         const card = getCardForSlot(day, p, 'class', cls.id);
                         const isLocked = (timeOffs[cls.id] || []).includes(`${day}-${p}`);
                         
+                        const isHovered = hoveredSlot?.day === day && hoveredSlot?.period === p && hoveredSlot?.classId === cls.id;
+                        let bg = isLocked ? 'rgba(239, 68, 68, 0.1)' : 'transparent';
+                        if (isHovered) {
+                          if (hoveredSlot.status === 'red') bg = 'rgba(239, 68, 68, 0.4)';
+                          else if (hoveredSlot.status === 'yellow') bg = 'rgba(234, 179, 8, 0.4)';
+                          else bg = 'rgba(34, 197, 94, 0.4)';
+                        }
+
                         return (
                           <td 
                             key={`${day}-${p}`} 
-                            onDragOver={(e) => handleDragOver(e, cls.id)}
-                            onDrop={(e) => handleDrop(e, day, p, cls.id)}
+                            onDragOver={(e) => handleDragOver(e, day, p, cls.id)}
+                            onDragLeave={() => setHoveredSlot(null)}
+                            onDrop={(e) => { setHoveredSlot(null); handleDrop(e, day, p, cls.id); }}
                             style={{ 
                               width: '130px', height: '55px', padding: '3px', 
                               borderLeft: '1px solid rgba(255,255,255,0.05)', 
                               borderBottom: borderBottomStyle,
-                              background: isLocked ? 'rgba(239, 68, 68, 0.1)' : 'transparent',
-                              transition: 'background var(--transition-fast)',
+                              background: bg,
+                              transition: 'background 0.1s ease',
                               verticalAlign: 'top'
                             }}
                           >
@@ -470,12 +704,44 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
 
   return (
     <div className="animate-fade-in">
-      <div className="flex justify-between items-center" style={{ marginBottom: '24px' }}>
-        <h2>Interactive Timetable Viewer</h2>
-        <div className="flex gap-4 items-center">
-          <span style={{ fontSize: '0.85rem', color: unplacedCards.length === 0 ? 'var(--success)' : 'var(--warning)' }}>
-            Unplaced: {unplacedCards.length}
-          </span>
+      <div className="flex justify-between items-center no-print" style={{ marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <h2 style={{ minWidth: '100%', marginBottom: '8px' }}>Interactive Timetable Viewer</h2>
+        
+        {/* STATS BADGES */}
+        <div className="flex gap-2 items-center" style={{ background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: '8px', flexWrap: 'wrap' }}>
+           <div style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+              Total: <span style={{ color: 'var(--accent-blue)' }}>{totalCardsCount}</span>
+           </div>
+           <div style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+              Placed: <span style={{ color: 'var(--success)' }}>{placedCardsCount}</span>
+           </div>
+           <div style={{ padding: '4px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem', fontWeight: 'bold' }}>
+              Stray: <span style={{ color: unplacedCards.length === 0 ? 'var(--success)' : 'var(--warning)' }}>{unplacedCards.length}</span>
+           </div>
+        </div>
+
+        <div className="flex gap-2 items-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: '16px' }}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={undo} 
+            disabled={pastStatesCount === 0} 
+            style={{ padding: '6px 12px', opacity: pastStatesCount === 0 ? 0.5 : 1 }}
+            title="Undo last timetable change"
+          >
+            ↩ Undo
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={redo} 
+            disabled={futureStatesCount === 0} 
+            style={{ padding: '6px 12px', opacity: futureStatesCount === 0 ? 0.5 : 1 }}
+            title="Redo"
+          >
+            ↪ Redo
+          </button>
+        </div>
+
+        <div className="flex gap-4 items-center" style={{ flexWrap: 'wrap' }}>
           <select className="input-field" value={colorTheme} onChange={e => setColorTheme(e.target.value)} style={{ padding: '8px 16px', backgroundColor: 'var(--bg-primary)' }}>
             <option value="default">Default Colors</option>
             <option value="teacher">Color by Staff</option>
@@ -489,16 +755,22 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
           <button className="btn btn-primary" onClick={handleGenerate} style={{ background: 'var(--success)', color: '#fff' }}>
             Auto-Generate Timetable
           </button>
-          <button className="btn btn-secondary" onClick={() => handlePrint('colorful')} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none' }}>
-            🖨️ Colorful Print
+          <button className="btn btn-secondary" onClick={() => handlePrint('colorful')} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none', padding: '6px 10px', fontSize: '0.8rem' }}>
+            🖨️ Colorful (A4 Land)
           </button>
-          <button className="btn btn-secondary" onClick={() => handlePrint('professional')} style={{ background: 'var(--accent-purple)', color: '#fff', border: 'none' }}>
-            🖨️ Professional Print
+          <button className="btn btn-secondary" onClick={() => handlePrint('professional')} style={{ background: 'var(--accent-purple)', color: '#fff', border: 'none', padding: '6px 10px', fontSize: '0.8rem' }}>
+            🖨️ Pro (A4 Port)
+          </button>
+          <button className="btn btn-secondary" onClick={() => handlePrint('a3-portrait')} style={{ background: 'var(--success)', color: '#fff', border: 'none', padding: '6px 10px', fontSize: '0.8rem' }}>
+            🖨️ Browser Print
+          </button>
+          <button className="btn btn-secondary" onClick={handleGeneratePDF} style={{ background: 'var(--danger)', color: '#fff', border: 'none', padding: '6px 10px', fontSize: '0.8rem' }}>
+            📄 Export PDF
           </button>
         </div>
       </div>
 
-      <div className="glass-card" style={{ marginBottom: '24px' }}>
+      <div className="glass-card no-print" style={{ marginBottom: '24px' }}>
         <div className="flex gap-4">
           <button className={`btn ${viewType === 'master' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setViewType('master')}>Master Drag-and-Drop Grid</button>
           <button className={`btn ${viewType === 'class' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setViewType('class')}>Class View</button>
@@ -519,7 +791,7 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
       </div>
 
       {(diagnosticsErrors.length > 0 || diagnosticsWarnings.length > 0) && (
-        <div className="glass-panel" style={{ marginBottom: '24px', background: diagnosticsErrors.length > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(234, 179, 8, 0.1)', border: `1px solid ${diagnosticsErrors.length > 0 ? 'var(--danger)' : 'var(--warning)'}` }}>
+        <div className="glass-panel no-print" style={{ marginBottom: '24px', background: diagnosticsErrors.length > 0 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(234, 179, 8, 0.1)', border: `1px solid ${diagnosticsErrors.length > 0 ? 'var(--danger)' : 'var(--warning)'}` }}>
           <div className="flex justify-between items-center" style={{ cursor: 'pointer' }} onClick={() => setIsDiagnosticsOpen(!isDiagnosticsOpen)}>
             <div className="flex items-center gap-2">
               <span style={{ fontSize: '1.2rem' }}>⚠️</span>
@@ -545,8 +817,8 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
-        <div className="glass-panel print-container" style={{ flex: 1, marginBottom: '24px', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div className="glass-panel print-container" style={{ flex: 1, minWidth: 0, marginBottom: '24px', overflowX: 'auto', paddingRight: '1px' }}>
           <h2 className="print-header">
             {viewType === 'master' ? 'Master Timetable' : (viewType === 'class' ? `Timetable: ${classes.find(c => c.id === selectedEntityId)?.name || ''}` : `Timetable: ${teachers.find(t => t.id === selectedEntityId)?.name || ''}`)}
           </h2>

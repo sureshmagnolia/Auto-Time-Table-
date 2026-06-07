@@ -1,12 +1,20 @@
-export const generateTimetable = async (lessons, teachersList, classesList, timeOffs, constraints, algorithm = 'backtracking', onProgress = () => {}) => {
+export const generateTimetable = async (lessons, teachersList, classesList, timeOffs, constraints, algorithm = 'backtracking', onProgress = () => {}, lockedCards = []) => {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const periods = [1, 2, 3, 4, 5];
   
   const cardsToPlace = [];
   lessons.forEach(lesson => {
-    for (let i = 0; i < lesson.periods; i++) {
+    const lockedForThisLesson = lockedCards.filter(c => c.lessonId === lesson.id).length;
+    const remainingPeriods = lesson.periods - lockedForThisLesson;
+    for (let i = 0; i < remainingPeriods; i++) {
       const ts = lesson.teachers || (lesson.teacherId ? [{id: lesson.teacherId, role: 'primary'}] : []);
-      cardsToPlace.push({ ...lesson, teachers: ts, uniqueId: `${lesson.id}-${i}` });
+      cardsToPlace.push({ 
+        ...lesson, 
+        teachers: ts, 
+        lessonId: lesson.id,
+        id: `card-${lesson.id}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+        uniqueId: `${lesson.id}-${i}` 
+      });
     }
   });
 
@@ -49,7 +57,8 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
   // --- GREEDY ENGINE ---
   if (algorithm === 'greedy') {
     const occupied = {};
-    const generatedCards = [];
+    const generatedCards = [...lockedCards];
+    lockedCards.forEach(c => markOccupied(c, c.day, c.period, occupied, null, true));
     let unplacedCount = 0;
     
     for (const card of cardsToPlace) {
@@ -59,8 +68,9 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
         for (const period of periods) {
           if (isFree(day, period, card.teachers, card.classId, occupied, {})) {
             generatedCards.push({
-              id: Date.now().toString() + Math.random().toString(),
-              lessonId: card.id, teachers: card.teachers, classId: card.classId, subjectId: card.subjectId, day, period
+              ...card,
+              day, 
+              period
             });
             markOccupied(card, day, period, occupied, null, true);
             placed = true;
@@ -68,7 +78,14 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
           }
         }
       }
-      if (!placed) unplacedCount++;
+      if (!placed) {
+        unplacedCount++;
+        generatedCards.push({
+          ...card,
+          day: null, 
+          period: null
+        });
+      }
       
       // Yield for UI update
       if (onProgress) onProgress({ type: 'Greedy', current: unplacedCount, text: `Placing cards...` });
@@ -77,83 +94,162 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
     return { cards: generatedCards, unplacedCount, timeout: false, type: 'Greedy' };
   }
 
-  // --- STOCHASTIC HEURISTIC ENGINE (Replaces traditional backtracking) ---
+  // --- ADVANCED HEURISTIC ENGINE (Iterative Repair / Min-Conflicts) ---
   if (algorithm === 'backtracking') {
     const START_TIME = Date.now();
     let lastYieldTime = START_TIME;
-    let bestSolution = [];
-    let bestUnplacedCount = 9999;
+    let bestSolution = [...lockedCards];
+    let bestUnplacedQueue = [...cardsToPlace].map(c => ({...c, day: null, period: null}));
+    let bestUnplacedCount = cardsToPlace.length;
     let iterations = 0;
 
-    const shuffleArray = (array) => {
-      const arr = [...array];
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return arr;
-    };
+    // 1. Planning Ahead: Calculate difficulty (MRV)
+    // Teachers with many classes are harder to place
+    const teacherLoad = {};
+    cardsToPlace.forEach(c => {
+      c.teachers.forEach(t => {
+        teacherLoad[t.id] = (teacherLoad[t.id] || 0) + 1;
+      });
+    });
+    
+    // Sort cardsToPlace: hardest first
+    const sortedCards = [...cardsToPlace].sort((a, b) => {
+      const loadA = a.teachers.reduce((sum, t) => sum + (teacherLoad[t.id] || 0), 0);
+      const loadB = b.teachers.reduce((sum, t) => sum + (teacherLoad[t.id] || 0), 0);
+      return loadB - loadA; // Higher load first
+    });
 
-    while ((Date.now() - START_TIME) < 3000) {
+    let currentPlacements = [...lockedCards];
+    const occupied = {};
+    const dailyCounts = {};
+    lockedCards.forEach(c => markOccupied(c, c.day, c.period, occupied, dailyCounts, true));
+    
+    let unplacedQueue = [...sortedCards];
+    const bumpCounts = {}; // Track how many times a card has been bumped (Tabu mechanism)
+
+    while ((Date.now() - START_TIME) < 8000 && unplacedQueue.length > 0) {
       iterations++;
       
       if (Date.now() - lastYieldTime > 100) {
         lastYieldTime = Date.now();
         const elapsed = lastYieldTime - START_TIME;
-        const remainingTime = Math.max(0, (3000 - elapsed));
+        const remainingTime = Math.max(0, (8000 - elapsed));
         const etaSec = (remainingTime / 1000).toFixed(1);
         
         onProgress({ 
-          type: 'Advanced Heuristic Search', 
+          type: 'Advanced Iterative Repair', 
           current: iterations, 
           total: null,
-          text: `Exploring timetable combinations... (Best: ${cardsToPlace.length - bestUnplacedCount} placed)`,
+          text: `Resolving conflicts... (Best: ${cardsToPlace.length - bestUnplacedCount} placed)`,
           eta: `${etaSec}s remaining`
         });
         await new Promise(r => setTimeout(r, 15)); // 15ms guarantees browser paint cycle
       }
 
-      const occupied = {};
-      const dailyCounts = {};
-      const currentPlacements = [];
-      let unplacedCount = 0;
-      
-      // Shuffle cards to explore different placement paths
-      const randomizedCards = shuffleArray(cardsToPlace);
+      const card = unplacedQueue.shift();
+      let bestSlot = null;
+      let minConflicts = 9999;
+      let bestConflicts = [];
 
-      for (const card of randomizedCards) {
-        let placed = false;
-        
-        // Randomize days/periods to avoid deterministic traps
-        const randDays = shuffleArray(days);
-        const randPeriods = shuffleArray(periods);
+      // Find the best slot (least bumps)
+      const dayOrder = days.slice().sort(() => Math.random() - 0.5); // Add some randomness to tie-breaking
+      const periodOrder = periods.slice().sort(() => Math.random() - 0.5);
 
-        for (const day of randDays) {
-          if (placed) break;
-          for (const period of randPeriods) {
-            if (isFree(day, period, card.teachers, card.classId, occupied, dailyCounts)) {
-              currentPlacements.push({
-                id: Math.random().toString(),
-                lessonId: card.id, teachers: card.teachers, classId: card.classId, subjectId: card.subjectId, day, period
-              });
-              markOccupied(card, day, period, occupied, dailyCounts, true);
-              placed = true;
-              break;
+      for (const day of dayOrder) {
+        for (const period of periodOrder) {
+          const tKey = `${day}-${period}`;
+          
+          // Hard constraints that cannot be bumped (TimeOffs and Locked Cards)
+          let valid = true;
+          if ((timeOffs[card.classId] || []).includes(tKey)) valid = false;
+          for (const t of card.teachers) {
+            if ((timeOffs[t.id] || []).includes(tKey)) valid = false;
+            const maxC = getRule(t.id, 'maxClassesPerDay');
+            if (maxC && maxC.isStrict) {
+               const hasCardInSlot = occupied[`${day}-${period}-${t.id}`];
+               // If placing here increases the daily count, check the limit
+               if (!hasCardInSlot && (dailyCounts[`${day}-${t.id}`] || 0) >= maxC.value) {
+                   valid = false;
+               }
             }
           }
+          if (!valid) continue;
+
+          // Check existing cards in this slot that would need bumping
+          const conflictingCards = [];
+          for (const placed of currentPlacements) {
+            if (placed.day !== day || placed.period !== period) continue;
+            
+            // Is there a collision?
+            let collision = false;
+            if (placed.classId === card.classId) collision = true;
+            for (const t of card.teachers) {
+              if (placed.teachers.some(pt => pt.id === t.id)) collision = true;
+            }
+            
+            if (collision) {
+               // We cannot bump locked cards!
+               if (lockedCards.some(lc => lc.id === placed.id)) {
+                  valid = false;
+                  break; 
+               }
+               conflictingCards.push(placed);
+            }
+          }
+          
+          if (!valid) continue;
+
+          // Tabu penalty: if bumping a card that has been bumped a lot recently, penalize this slot
+          let penalty = conflictingCards.length;
+          conflictingCards.forEach(cc => {
+            penalty += (bumpCounts[cc.id] || 0) * 0.5; // Avoid bumping the same cards repeatedly
+          });
+
+          if (penalty < minConflicts) {
+            minConflicts = penalty;
+            bestSlot = { day, period };
+            bestConflicts = conflictingCards;
+          }
         }
-        if (!placed) unplacedCount++;
       }
 
-      if (unplacedCount < bestUnplacedCount) {
-        bestUnplacedCount = unplacedCount;
-        bestSolution = [...currentPlacements];
+      if (bestSlot) {
+        // Bump conflicting cards
+        bestConflicts.forEach(bc => {
+           // Remove from current placements
+           const idx = currentPlacements.findIndex(p => p.id === bc.id);
+           if (idx > -1) currentPlacements.splice(idx, 1);
+           markOccupied(bc, bc.day, bc.period, occupied, dailyCounts, false);
+           
+           // Update bump count
+           bumpCounts[bc.id] = (bumpCounts[bc.id] || 0) + 1;
+           
+           // Put back in unplaced queue
+           unplacedQueue.push(bc);
+        });
+
+        // Place new card
+        card.day = bestSlot.day;
+        card.period = bestSlot.period;
+        currentPlacements.push(card);
+        markOccupied(card, card.day, card.period, occupied, dailyCounts, true);
+        
+      } else {
+        // Absolutely nowhere to put it (all slots blocked by locked cards/timeoffs)
+        // Push it back to the end of the queue to try other cards first
+        unplacedQueue.push(card);
       }
 
-      if (bestUnplacedCount === 0) break; // Perfect score!
+      if (unplacedQueue.length < bestUnplacedCount) {
+        bestUnplacedCount = unplacedQueue.length;
+        bestSolution = currentPlacements.map(c => ({...c})); // deep copy
+        bestUnplacedQueue = unplacedQueue.map(c => ({...c, day: null, period: null}));
+      }
+
+      if (bestUnplacedCount === 0) break; // Perfect!
     }
 
-    return { cards: bestSolution, unplacedCount: bestUnplacedCount, timeout: bestUnplacedCount > 0, type: 'Advanced Heuristic' };
+    return { cards: [...bestSolution, ...bestUnplacedQueue], unplacedCount: bestUnplacedCount, timeout: bestUnplacedCount > 0, type: 'Advanced Iterative Repair' };
   }
 
   // --- GENETIC / EVOLUTIONARY ENGINE ---
@@ -167,6 +263,18 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
       let placedCount = 0;
       const occ = {};
       const tCounts = {};
+
+      // Pre-fill occupied array with locked cards
+      lockedCards.forEach(c => {
+        if (!c.day) return;
+        const keyC = `${c.day}-${c.period}-${c.classId}`;
+        const tKey = `${c.day}-${c.period}`;
+        occ[keyC] = true;
+        c.teachers.forEach(t => {
+           occ[`${c.day}-${c.period}-${t.id}`] = true;
+           tCounts[`${c.day}-${t.id}`] = (tCounts[`${c.day}-${t.id}`] || 0) + 1;
+        });
+      });
 
       indCards.forEach(c => {
         if (!c.day) return;
@@ -207,7 +315,7 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
       cardsToPlace.forEach(card => {
         const pDay = days[Math.floor(Math.random() * days.length)];
         const pPeriod = periods[Math.floor(Math.random() * periods.length)];
-        ind.push({ ...card, day: pDay, period: pPeriod, id: Math.random().toString() });
+        ind.push({ ...card, day: pDay, period: pPeriod });
       });
       return ind;
     };
@@ -257,8 +365,13 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
       }
     }
 
-    const finalCards = [];
+    const finalCards = [...lockedCards];
     const occ = {};
+    lockedCards.forEach(c => {
+       occ[`${c.day}-${c.period}-${c.classId}`] = true;
+       c.teachers.forEach(t => occ[`${c.day}-${c.period}-${t.id}`] = true);
+    });
+
     bestIndividual.cards.forEach(c => {
         const keyC = `${c.day}-${c.period}-${c.classId}`;
         const tKey = `${c.day}-${c.period}`;

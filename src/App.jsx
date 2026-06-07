@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import './index.css';
-import { useLocalStorage } from './useLocalStorage';
+import { useStore } from './store';
 import { initialData } from './initialData';
 import { TimetableViewer } from './TimetableViewer';
 import { ConstraintsManager } from './ConstraintsManager';
@@ -8,7 +8,7 @@ import { StatisticsViewer } from './StatisticsViewer';
 import { parseAscXml } from './xmlParser';
 
 // Dashboard component
-const Dashboard = ({ stats, onLoadTestData, onExportData, onImportData, onImportXml }) => (
+const Dashboard = ({ stats, onLoadTestData, onExportData, onImportData, onImportXml, onClearAllData }) => (
   <div className="animate-fade-in">
     <div className="flex justify-between items-center">
       <h2>Dashboard</h2>
@@ -26,6 +26,9 @@ const Dashboard = ({ stats, onLoadTestData, onExportData, onImportData, onImport
         </button>
         <button className="btn btn-primary" onClick={onLoadTestData}>
           Load Test Data
+        </button>
+        <button className="btn btn-danger" onClick={onClearAllData}>
+          Clear All Data
         </button>
       </div>
     </div>
@@ -394,27 +397,11 @@ const TimeOffManager = ({ teachers, classes, timeOffs, setTimeOffs }) => {
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   
-  // Data State
-  const [teachers, setTeachers] = useLocalStorage('app-teachers', []);
-  const [classes, setClasses] = useLocalStorage('app-classes', []);
-  const [subjects, setSubjects] = useLocalStorage('app-subjects', []);
-  const [classrooms, setClassrooms] = useLocalStorage('app-classrooms', []);
-  
-  // Phase 2 State
-  const [lessons, setLessons] = useLocalStorage('app-lessons', []);
-  const [timeOffs, setTimeOffs] = useLocalStorage('app-timeoffs', {}); // { entityId: ["Mon-1", "Tue-2"] }
-
-  // Phase 3, 4, 5 State
-  const [generatedCards, setGeneratedCards] = useLocalStorage('app-generated-cards', []);
-  const [constraints, setConstraints] = useLocalStorage('app-advanced-constraints', {
-    global: {
-      maxClassesPerDay: { value: 5, isStrict: true },
-      minClassesPerDay: { value: 1, isStrict: false },
-      maxConsecutive: { value: 3, isStrict: true },
-      uniformDistribution: { value: true, isStrict: false }
-    },
-    teachers: {}
-  });
+  const { 
+    teachers, classes, subjects, classrooms, lessons, timeOffs, constraints, generatedCards,
+    setTeachers, setClasses, setSubjects, setClassrooms, setLessons, setTimeOffs, setConstraints, setGeneratedCards,
+    clearAllData, importData
+  } = useStore();
 
   const stats = {
     teachers: teachers.length,
@@ -431,6 +418,13 @@ function App() {
       setClassrooms(initialData.classrooms);
       setLessons(initialData.lessons);
       alert("Test data loaded successfully!");
+    }
+  };
+
+  const handleClearAllData = () => {
+    if (window.confirm("WARNING: This will permanently clear ALL teachers, classes, subjects, lessons, time-offs, constraints and the timetable. Are you absolutely sure?")) {
+      clearAllData();
+      alert("All data cleared successfully.");
     }
   };
 
@@ -459,14 +453,7 @@ function App() {
         const data = JSON.parse(event.target.result);
         if (data.teachers && data.classes && data.lessons) {
           if (window.confirm("This will overwrite your current data with the imported JSON data. Proceed?")) {
-            setTeachers(data.teachers || []);
-            setClasses(data.classes || []);
-            setSubjects(data.subjects || []);
-            setClassrooms(data.classrooms || []);
-            setLessons(data.lessons || []);
-            setTimeOffs(data.timeOffs || {});
-            setConstraints(data.constraints || { global: {}, teachers: {} });
-            setGeneratedCards(data.generatedCards || []);
+            importData(data);
             alert("Data imported successfully!");
           }
         } else {
@@ -513,7 +500,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard stats={stats} onLoadTestData={handleLoadTestData} onExportData={handleExportData} onImportData={handleImportData} onImportXml={handleImportXml} />;
+        return <Dashboard stats={stats} onLoadTestData={handleLoadTestData} onExportData={handleExportData} onImportData={handleImportData} onImportXml={handleImportXml} onClearAllData={handleClearAllData} />;
       case 'teachers':
         return <CrudManager title="Teachers" data={teachers} setData={setTeachers} columns={[{ key: 'name', label: 'Name' }, { key: 'short', label: 'Short Name' }]} />;
       case 'classes':
@@ -533,7 +520,7 @@ function App() {
       case 'viewer':
         return <TimetableViewer teachers={teachers} classes={classes} subjects={subjects} lessons={lessons} timeOffs={timeOffs} generatedCards={generatedCards} setGeneratedCards={setGeneratedCards} constraints={constraints} />;
       default:
-        return <Dashboard stats={stats} />;
+        return <Dashboard stats={stats} onLoadTestData={handleLoadTestData} onExportData={handleExportData} onImportData={handleImportData} onImportXml={handleImportXml} onClearAllData={handleClearAllData} />;
     }
   };
 

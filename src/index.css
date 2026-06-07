@@ -278,7 +278,7 @@ select.input-field option {
 
   /* Hide all UI shell elements in both modes */
   header, nav, .btn, .stray-cards-bin, .input-field, .input-group, 
-  .diagnostics-panel {
+  .diagnostics-panel, .no-print {
     display: none !important;
   }
 
@@ -312,6 +312,40 @@ select.input-field option {
 
   body.print-mode-colorful .data-table {
     width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 8pt !important;
+  }
+
+  body.print-mode-colorful .data-table tr {
+    page-break-inside: avoid !important;
+  }
+
+  body.print-mode-colorful .data-table th,
+  body.print-mode-colorful .data-table td {
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+
+  body.print-mode-colorful .data-table th {
+    background-color: #f8fafc !important;
+    font-weight: bold !important;
+  }
+
+  body.print-mode-colorful .timetable-card {
+    box-shadow: none !important;
+    border: 1px solid rgba(0,0,0,0.15) !important;
+  }
+
+  body.print-mode-colorful .card-title {
+    text-shadow: none !important;
+    color: white !important;
+    font-weight: 700 !important;
+  }
+
+  body.print-mode-colorful .card-subtitle {
+    text-shadow: none !important;
+    color: rgba(255,255,255,0.95) !important;
+    font-weight: 500 !important;
   }
 }
 
