@@ -269,40 +269,40 @@ select.input-field option {
   background: rgba(255, 255, 255, 0.02);
 }
 
-/* Print Styles */
+/* Print Styles Foundation */
 @media print {
-  @page {
-    size: A4 landscape;
-    margin: 10mm;
-  }
-
   body {
     background: white !important;
-    color: black !important;
     min-height: auto !important;
   }
 
-  /* Hide all UI elements and interactive grids */
+  /* Hide all UI shell elements in both modes */
   header, nav, .btn, .stray-cards-bin, .input-field, .input-group, 
-  .glass-card, 
-  .glass-panel,
-  .print-container,
   .diagnostics-panel {
     display: none !important;
   }
 
-  .formal-print-only {
-    display: block !important;
-  }
-
-  /* Make sure the main grid is fully visible */
   .container {
     padding: 0 !important;
     margin: 0 !important;
     max-width: none !important;
   }
 
-  .print-container {
+  /* Shared card properties */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* --- COLORFUL PRINT MODE --- */
+@media print {
+  body.print-mode-colorful .formal-print-only {
+    display: none !important;
+  }
+  
+  body.print-mode-colorful .print-container {
+    display: block !important;
     background: white !important;
     border: none !important;
     box-shadow: none !important;
@@ -310,50 +310,59 @@ select.input-field option {
     overflow: visible !important;
   }
 
-  /* Keep colors on cards */
-  * {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
+  body.print-mode-colorful .data-table {
+    width: 100% !important;
+  }
+}
+
+/* --- PROFESSIONAL PRINT MODE --- */
+@media print {
+  body.print-mode-professional .print-container {
+    display: none !important;
+  }
+  
+  body.print-mode-professional .glass-card,
+  body.print-mode-professional .glass-panel:not(.formal-print-only) {
+    display: none !important;
   }
 
-  /* Optimize the table for print */
-  .data-table {
+  body.print-mode-professional .formal-print-only {
+    display: flex !important;
+    flex-direction: column;
+    height: 98vh !important; /* Stretch to fill page */
+    width: 100% !important;
+    background: white;
+  }
+
+  body.print-mode-professional .formal-print-only table {
+    flex: 1; /* Automatically adjust row heights to fill remaining space */
     border-collapse: collapse !important;
     width: 100% !important;
     border: 2px solid #000 !important;
   }
 
-  .data-table th, .data-table td {
+  body.print-mode-professional .data-table th, 
+  body.print-mode-professional .formal-print-only td,
+  body.print-mode-professional .formal-print-only th {
     border: 1px solid #333 !important;
     color: black !important;
   }
   
-  .data-table th {
+  body.print-mode-professional .formal-print-only th {
     background: #f0f0f0 !important;
   }
 
-  /* Special handling for day headers in master grid */
-  .data-table td[rowspan] {
+  body.print-mode-professional .formal-print-only td[rowspan] {
     background: #f8f8f8 !important;
     border-right: 2px solid #000 !important;
   }
 
-  /* Ensure card borders look good in print */
-  .timetable-card {
-    border: 1px solid #000 !important;
-    color: white !important; /* Keep card text white for contrast against background colors */
-  }
-
-  .timetable-card .card-subtitle {
-    color: rgba(255, 255, 255, 0.95) !important;
-  }
-
-  .print-header {
+  body.print-mode-professional .print-header {
     display: block !important;
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     font-family: var(--font-heading);
-    font-size: 24px;
+    font-size: 20px;
     color: black;
   }
 }

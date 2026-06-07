@@ -95,8 +95,29 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
 
   // --- DRAG AND DROP HANDLERS ---
   
-  const handleDragStart = (e, source, card) => {
-    setDraggedCard({ source, data: card });
+  const handlePrint = (mode) => {
+    // Inject dynamic @page rules because CSS classes on body can't change global @page
+    const style = document.createElement('style');
+    style.id = 'dynamic-print-style';
+    if (mode === 'professional') {
+      style.innerHTML = '@page { size: A4 portrait; margin: 10mm; }';
+    } else {
+      style.innerHTML = '@page { size: A4 landscape; margin: 10mm; }';
+    }
+    document.head.appendChild(style);
+    
+    document.body.classList.add(`print-mode-${mode}`);
+    
+    // Allow React/DOM to paint before blocking with window.print()
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove(`print-mode-${mode}`);
+      document.head.removeChild(style);
+    }, 100);
+  };
+
+  const handleDragStart = (e, source, data) => {
+    setDraggedCard({ source, data });
     // Required for Firefox
     e.dataTransfer.effectAllowed = 'move';
     // Small hack to make the drag image look better (optional)
@@ -458,8 +479,11 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
           <button className="btn btn-primary" onClick={handleGenerate} style={{ background: 'var(--success)', color: '#fff' }}>
             Auto-Generate Timetable
           </button>
-          <button className="btn btn-secondary" onClick={() => window.print()} style={{ background: 'var(--accent-purple)', color: '#fff', border: 'none' }}>
-            🖨️ Print
+          <button className="btn btn-secondary" onClick={() => handlePrint('colorful')} style={{ background: 'var(--accent-blue)', color: '#fff', border: 'none' }}>
+            🖨️ Colorful Print
+          </button>
+          <button className="btn btn-secondary" onClick={() => handlePrint('professional')} style={{ background: 'var(--accent-purple)', color: '#fff', border: 'none' }}>
+            🖨️ Professional Print
           </button>
         </div>
       </div>
