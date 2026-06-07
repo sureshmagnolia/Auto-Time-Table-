@@ -391,6 +391,9 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
           <button className="btn btn-primary" onClick={handleGenerate} style={{ background: 'var(--success)', color: '#fff' }}>
             Auto-Generate Timetable
           </button>
+          <button className="btn btn-secondary" onClick={() => window.print()} style={{ background: 'var(--accent-purple)', color: '#fff', border: 'none' }}>
+            🖨️ Print
+          </button>
         </div>
       </div>
 
@@ -442,7 +445,10 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
       )}
 
       <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
-        <div className="glass-panel" style={{ flex: 1, marginBottom: '24px', overflowX: 'auto' }}>
+        <div className="glass-panel print-container" style={{ flex: 1, marginBottom: '24px', overflowX: 'auto' }}>
+          <h2 className="print-header">
+            {viewType === 'master' ? 'Master Timetable' : (viewType === 'class' ? `Timetable: ${classes.find(c => c.id === selectedEntityId)?.name || ''}` : `Timetable: ${teachers.find(t => t.id === selectedEntityId)?.name || ''}`)}
+          </h2>
           {viewType === 'master' ? renderMasterGrid() : renderSingleEntityGrid()}
         </div>
 

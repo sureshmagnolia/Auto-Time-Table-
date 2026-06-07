@@ -268,3 +268,91 @@ select.input-field option {
 .data-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.02);
 }
+
+/* Print Styles */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    min-height: auto !important;
+  }
+
+  /* Hide all UI elements */
+  header, nav, .btn, .stray-cards-bin, .input-field, .input-group, 
+  .glass-card:not(.print-container), 
+  .glass-panel:not(.print-container),
+  .diagnostics-panel {
+    display: none !important;
+  }
+
+  /* Make sure the main grid is fully visible */
+  .container {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  .print-container {
+    background: white !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Keep colors on cards */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Optimize the table for print */
+  .data-table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    border: 2px solid #000 !important;
+  }
+
+  .data-table th, .data-table td {
+    border: 1px solid #333 !important;
+    color: black !important;
+  }
+  
+  .data-table th {
+    background: #f0f0f0 !important;
+  }
+
+  /* Special handling for day headers in master grid */
+  .data-table td[rowspan] {
+    background: #f8f8f8 !important;
+    border-right: 2px solid #000 !important;
+  }
+
+  /* Ensure card borders look good in print */
+  .timetable-card {
+    border: 1px solid #000 !important;
+    color: white !important; /* Keep card text white for contrast against background colors */
+  }
+
+  .timetable-card .card-subtitle {
+    color: rgba(255, 255, 255, 0.95) !important;
+  }
+
+  .print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 20px;
+    font-family: var(--font-heading);
+    font-size: 24px;
+    color: black;
+  }
+}
+
+.print-header {
+  display: none;
+}
