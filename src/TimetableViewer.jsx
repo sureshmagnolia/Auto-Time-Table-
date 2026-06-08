@@ -720,27 +720,6 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
            </div>
         </div>
 
-        <div className="flex gap-2 items-center" style={{ borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: '16px' }}>
-          <button 
-            className="btn btn-secondary" 
-            onClick={undo} 
-            disabled={pastStatesCount === 0} 
-            style={{ padding: '6px 12px', opacity: pastStatesCount === 0 ? 0.5 : 1 }}
-            title="Undo last timetable change"
-          >
-            ↩ Undo
-          </button>
-          <button 
-            className="btn btn-secondary" 
-            onClick={redo} 
-            disabled={futureStatesCount === 0} 
-            style={{ padding: '6px 12px', opacity: futureStatesCount === 0 ? 0.5 : 1 }}
-            title="Redo"
-          >
-            ↪ Redo
-          </button>
-        </div>
-
         <div className="flex gap-4 items-center" style={{ flexWrap: 'wrap' }}>
           <select className="input-field" value={colorTheme} onChange={e => setColorTheme(e.target.value)} style={{ padding: '8px 16px', backgroundColor: 'var(--bg-primary)' }}>
             <option value="default">Default Colors</option>
@@ -832,11 +811,33 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
               backgroundColor: 'rgba(15, 15, 25, 0.95)' // Make it mostly opaque so it overlays the grid clearly
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', position: 'sticky', top: '0', backgroundColor: 'inherit', zIndex: 5 }}>
-              <h4 style={{ color: 'var(--text-secondary)', margin: 0, whiteSpace: 'nowrap', marginRight: '16px' }}>
-                Stray Cards ({unplacedCards.length})
-              </h4>
-              {unplacedCards.length === 0 && <span style={{ color: 'var(--success)' }}>All cards placed!</span>}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', position: 'sticky', top: '0', backgroundColor: 'inherit', zIndex: 5 }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <h4 style={{ color: 'var(--text-secondary)', margin: 0, whiteSpace: 'nowrap', marginRight: '16px' }}>
+                  Stray Cards ({unplacedCards.length})
+                </h4>
+                {unplacedCards.length === 0 && <span style={{ color: 'var(--success)' }}>All cards placed!</span>}
+              </div>
+              <div className="flex gap-2 items-center">
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={undo} 
+                  disabled={pastStatesCount === 0} 
+                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: pastStatesCount === 0 ? 0.5 : 1 }}
+                  title="Undo last timetable change"
+                >
+                  ↩ Undo
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={redo} 
+                  disabled={futureStatesCount === 0} 
+                  style={{ padding: '4px 10px', fontSize: '0.8rem', opacity: futureStatesCount === 0 ? 0.5 : 1 }}
+                  title="Redo"
+                >
+                  ↪ Redo
+                </button>
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', paddingBottom: '8px' }}>
               {unplacedCards.map(card => (
