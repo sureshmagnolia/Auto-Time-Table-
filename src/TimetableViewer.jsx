@@ -445,10 +445,10 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
         className="timetable-card"
         style={{ 
           opacity: draggedCard?.data?.id === card.id ? 0.5 : 1, 
-          padding: '4px 6px', 
+          padding: '4px', 
           background: bg, 
           color: 'white', 
-          borderRadius: '6px', 
+          borderRadius: '4px', 
           fontSize: '0.65rem', 
           cursor: card.locked ? 'default' : 'grab', 
           boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
@@ -484,12 +484,12 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
 
   const renderMasterGrid = () => {
     return (
-      <div style={{ overflowX: 'auto', marginTop: '16px' }}>
-        <table className="data-table" style={{ background: 'rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap' }}>
+      <div style={{ overflowX: 'hidden', marginTop: '16px' }}>
+        <table className="data-table" style={{ background: 'rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.1)', width: '100%', tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th style={{ width: '80px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Day</th>
-              <th style={{ width: '120px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
+              <th style={{ width: '60px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Day</th>
+              <th style={{ width: '90px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   Class
                   <div className="no-print" style={{ display: 'flex', gap: '4px' }}>
@@ -559,7 +559,7 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
                             onDragLeave={() => setHoveredSlot(null)}
                             onDrop={(e) => { setHoveredSlot(null); handleDrop(e, day, p, cls.id); }}
                             style={{ 
-                              width: '130px', height: '55px', padding: '3px', 
+                              padding: '3px', 
                               borderLeft: '1px solid rgba(255,255,255,0.05)', 
                               borderBottom: borderBottomStyle,
                               background: bg,
@@ -587,10 +587,10 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
     
     return (
       <div className="animate-fade-in" style={{ overflowX: 'auto', marginTop: '16px' }}>
-        <table className="data-table" style={{ background: 'rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.1)', whiteSpace: 'nowrap', width: '100%' }}>
+        <table className="data-table" style={{ background: 'rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.1)', tableLayout: 'fixed', width: '100%' }}>
           <thead>
             <tr>
-              <th style={{ width: '100px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Day</th>
+              <th style={{ width: '80px', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Day</th>
               {periods.map(p => <th key={p} style={{ textAlign: 'center', borderBottom: '2px solid rgba(255,255,255,0.2)' }}>Period {p}</th>)}
             </tr>
           </thead>
@@ -818,42 +818,40 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
       )}
 
       <div style={{ position: 'relative' }}>
+        {viewType === 'master' && (
+          <div className="stray-cards-bin glass-panel" 
+            onDragOver={handleDragOver}
+            onDrop={handleDropToBin}
+            style={{ 
+              position: 'sticky', top: '10px', zIndex: 100,
+              width: '100%', marginBottom: '24px',
+              display: 'flex', flexDirection: 'column',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              backdropFilter: 'blur(20px)',
+              backgroundColor: 'rgba(15, 15, 25, 0.95)' // Make it mostly opaque so it overlays the grid clearly
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
+              <h4 style={{ color: 'var(--text-secondary)', margin: 0, whiteSpace: 'nowrap', marginRight: '16px' }}>
+                Stray Cards ({unplacedCards.length})
+              </h4>
+              {unplacedCards.length === 0 && <span style={{ color: 'var(--success)' }}>All cards placed!</span>}
+            </div>
+            <div style={{ display: 'flex', overflowX: 'auto', gap: '10px', paddingBottom: '8px' }}>
+              {unplacedCards.map(card => (
+                 <div key={card.uniqueId} style={{ flexShrink: 0, width: '200px' }}>{renderCard(card, true)}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="glass-panel print-container" style={{ width: '100%', marginBottom: '24px', overflowX: 'auto', paddingRight: '1px' }}>
           <h2 className="print-header">
             {viewType === 'master' ? 'Master Timetable' : (viewType === 'class' ? `Timetable: ${classes.find(c => c.id === selectedEntityId)?.name || ''}` : `Timetable: ${teachers.find(t => t.id === selectedEntityId)?.name || ''}`)}
           </h2>
           {viewType === 'master' ? renderMasterGrid() : renderSingleEntityGrid()}
         </div>
-
-        {viewType === 'master' && (
-          <div className="stray-cards-bin glass-panel" 
-            onDragOver={handleDragOver}
-            onDrop={handleDropToBin}
-            style={{ 
-              position: 'fixed', right: '24px', top: '100px', zIndex: 100,
-              width: '400px', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto',
-              display: 'flex', flexDirection: 'column',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              backdropFilter: 'blur(10px)'
-            }}
-          >
-            <h4 style={{ 
-              marginBottom: '16px', color: 'var(--text-secondary)', 
-              position: 'sticky', top: '-16px', background: 'var(--bg-dark)', 
-              padding: '16px 0', zIndex: 10, margin: '-16px -16px 16px -16px', paddingLeft: '16px',
-              borderBottom: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              Stray Cards ({unplacedCards.length})
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-              {unplacedCards.map(card => (
-                 <div key={card.uniqueId}>{renderCard(card, true)}</div>
-              ))}
-              {unplacedCards.length === 0 && <span style={{ color: 'var(--success)', gridColumn: '1 / -1' }}>All cards placed!</span>}
-            </div>
-          </div>
-        )}
       </div>
       
       {/* Formal Print View (Hidden from UI, visible only when printing) */}
