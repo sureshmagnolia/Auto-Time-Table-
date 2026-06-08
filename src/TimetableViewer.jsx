@@ -824,7 +824,7 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
             onDrop={handleDropToBin}
             style={{ 
               position: 'sticky', top: '10px', zIndex: 100,
-              width: '100%', marginBottom: '24px',
+              width: '100%', marginBottom: '24px', maxHeight: '30vh', overflowY: 'auto',
               display: 'flex', flexDirection: 'column',
               boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
               border: '1px solid rgba(255,255,255,0.2)',
@@ -832,15 +832,15 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
               backgroundColor: 'rgba(15, 15, 25, 0.95)' // Make it mostly opaque so it overlays the grid clearly
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', position: 'sticky', top: '0', backgroundColor: 'inherit', zIndex: 5 }}>
               <h4 style={{ color: 'var(--text-secondary)', margin: 0, whiteSpace: 'nowrap', marginRight: '16px' }}>
                 Stray Cards ({unplacedCards.length})
               </h4>
               {unplacedCards.length === 0 && <span style={{ color: 'var(--success)' }}>All cards placed!</span>}
             </div>
-            <div style={{ display: 'flex', overflowX: 'auto', gap: '10px', paddingBottom: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', paddingBottom: '8px' }}>
               {unplacedCards.map(card => (
-                 <div key={card.uniqueId} style={{ flexShrink: 0, width: '200px' }}>{renderCard(card, true)}</div>
+                 <div key={card.uniqueId}>{renderCard(card, true)}</div>
               ))}
             </div>
           </div>
