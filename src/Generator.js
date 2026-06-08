@@ -132,13 +132,13 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
     let unplacedQueue = [...sortedCards];
     const bumpCounts = {}; // Track how many times a card has been bumped (Tabu mechanism)
 
-    while ((Date.now() - START_TIME) < 8000 && unplacedQueue.length > 0) {
+    while ((Date.now() - START_TIME) < 30000 && unplacedQueue.length > 0) {
       iterations++;
       
       if (Date.now() - lastYieldTime > 100) {
         lastYieldTime = Date.now();
         const elapsed = lastYieldTime - START_TIME;
-        const remainingTime = Math.max(0, (8000 - elapsed));
+        const remainingTime = Math.max(0, (30000 - elapsed));
         const etaSec = (remainingTime / 1000).toFixed(1);
         
         onProgress({ 
@@ -330,13 +330,13 @@ export const generateTimetable = async (lessons, teachersList, classesList, time
     let gen = 0;
     let lastYieldTime = START_TIME;
     
-    while ((Date.now() - START_TIME) < 5000) {
+    while ((Date.now() - START_TIME) < 15000) {
       gen++;
       
       if (Date.now() - lastYieldTime > 100) {
         lastYieldTime = Date.now();
         const elapsed = lastYieldTime - START_TIME;
-        const remainingTime = Math.max(0, (5000 - elapsed));
+        const remainingTime = Math.max(0, (15000 - elapsed));
         const etaSec = (remainingTime / 1000).toFixed(1);
         
         onProgress({ 

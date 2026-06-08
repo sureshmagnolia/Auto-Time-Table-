@@ -44,7 +44,7 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
       const remaining = l.periods - placed;
       for (let i = 0; i < remaining; i++) {
         const strayMatch = generatedCards.find(c => c.lessonId === l.id && c.day === null);
-        unplaced.push({ ...l, id: strayMatch ? strayMatch.id : `${l.id}-unplaced-${i}`, uniqueId: `${l.id}-unplaced-${i}` });
+        unplaced.push({ ...l, lessonId: l.id, id: strayMatch ? strayMatch.id : `${l.id}-unplaced-${i}`, uniqueId: `${l.id}-unplaced-${i}` });
       }
     });
     return unplaced;
@@ -817,8 +817,8 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div className="glass-panel print-container" style={{ flex: 1, minWidth: 0, marginBottom: '24px', overflowX: 'auto', paddingRight: '1px' }}>
+      <div style={{ position: 'relative' }}>
+        <div className="glass-panel print-container" style={{ width: '100%', marginBottom: '24px', overflowX: 'auto', paddingRight: '1px' }}>
           <h2 className="print-header">
             {viewType === 'master' ? 'Master Timetable' : (viewType === 'class' ? `Timetable: ${classes.find(c => c.id === selectedEntityId)?.name || ''}` : `Timetable: ${teachers.find(t => t.id === selectedEntityId)?.name || ''}`)}
           </h2>
@@ -830,19 +830,23 @@ export const TimetableViewer = ({ teachers, classes, subjects, lessons, timeOffs
             onDragOver={handleDragOver}
             onDrop={handleDropToBin}
             style={{ 
-              width: '320px', flexShrink: 0, position: 'sticky', top: '24px', 
-              maxHeight: 'calc(100vh - 48px)', overflowY: 'auto',
-              display: 'flex', flexDirection: 'column'
+              position: 'fixed', right: '24px', top: '100px', zIndex: 100,
+              width: '400px', maxHeight: 'calc(100vh - 120px)', overflowY: 'auto',
+              display: 'flex', flexDirection: 'column',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              backdropFilter: 'blur(10px)'
             }}
           >
             <h4 style={{ 
               marginBottom: '16px', color: 'var(--text-secondary)', 
               position: 'sticky', top: '-16px', background: 'var(--bg-dark)', 
-              padding: '16px 0', zIndex: 10, margin: '-16px -16px 16px -16px', paddingLeft: '16px'
+              padding: '16px 0', zIndex: 10, margin: '-16px -16px 16px -16px', paddingLeft: '16px',
+              borderBottom: '1px solid rgba(255,255,255,0.1)'
             }}>
               Stray Cards ({unplacedCards.length})
             </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
               {unplacedCards.map(card => (
                  <div key={card.uniqueId}>{renderCard(card, true)}</div>
               ))}
