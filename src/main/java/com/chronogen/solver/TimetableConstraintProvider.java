@@ -96,7 +96,7 @@ public class TimetableConstraintProvider implements ConstraintProvider {
                     }
                     return false;
                 })
-                .penalize(HardSoftScore.ONE_SOFT, 10)
+                .penalize(HardSoftScore.ofSoft(10))
                 .asConstraint("Teacher preference - avoid");
     }
 
@@ -117,7 +117,7 @@ public class TimetableConstraintProvider implements ConstraintProvider {
                     }
                     return false;
                 })
-                .reward(HardSoftScore.ONE_SOFT, 10)
+                .reward(HardSoftScore.ofSoft(10))
                 .asConstraint("Teacher preference - prefer");
     }
 
