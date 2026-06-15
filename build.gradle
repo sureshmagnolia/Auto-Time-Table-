@@ -1,0 +1,50 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'org.openjfx.javafxplugin' version '0.1.0'
+}
+
+group = 'com.chronogen'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Timefold Solver (AI Constraint Satisfaction Engine)
+    implementation 'ai.timefold.solver:timefold-solver-core:1.10.0'
+    implementation 'ai.timefold.solver:timefold-solver-jackson:1.10.0'
+
+    // AtlantaFX (Modern CSS Theme Library for JavaFX)
+    implementation 'io.github.mkpaz:atlantafx-base:2.0.1'
+
+    // SQLite Database & JDBC Driver
+    implementation 'org.xerial:sqlite-jdbc:3.45.2.0'
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    implementation 'org.slf4j:slf4j-simple:2.0.12'
+
+    // Testing
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+javafx {
+    version = '21'
+    modules = ['javafx.controls', 'javafx.fxml']
+}
+
+application {
+    mainClass = 'com.chronogen.ui.MainApp'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+test {
+    useJUnitPlatform()
+}
